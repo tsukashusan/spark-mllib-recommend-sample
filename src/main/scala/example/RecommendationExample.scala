@@ -23,6 +23,7 @@ object RecommendationExample extends Greeting with App {
         val Array(training, test) = ratings.randomSplit(Array(0.8, 0.2))
         training.printSchema()
         training.show(5)
+        println(s"☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆")
         // Build the recommendation model using ALS on the training data
         val als = new ALS()
           .setMaxIter(5)
@@ -34,10 +35,10 @@ object RecommendationExample extends Greeting with App {
         
         // Evaluate the model by computing the RMSE on the test data
         val predictions = model.transform(test).na.drop(Array("prediction"))
-        println(s"☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆") 
+        println(s"☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆")
         predictions.printSchema()
         predictions.show(5)
-        println(s"☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆") 
+        println(s"☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆")
         val evaluator = new RegressionEvaluator()
           .setMetricName("rmse")
           .setLabelCol("rating")
