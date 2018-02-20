@@ -1,103 +1,53 @@
 package example
 
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.SparkContext
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.Dataset
-import org.apache.spark.rdd.RDD
+import org.apache.log4j.{Level, Logger}
 
-import org.apache.spark.mllib.recommendation.ALS
-import org.apache.spark.mllib.recommendation.MatrixFactorizationModel
-import org.apache.spark.mllib.recommendation.Rating
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.ml.evaluation.RegressionEvaluator
+import org.apache.spark.ml.recommendation.ALS
+
+case class Rating(userId: Int, movieId: Int, rating: Float, timestamp: Long)
 
 object RecommendationExample extends Greeting with App {
-  sparkLoadModel()
-  def sparkCreteModel(): Unit = {
-    val spark = SparkSession.builder.appName("CollaborativeFilteringExample").getOrCreate()
-    import spark.implicits._
-    //val sc = spark.sparkContext
+    val rootLogger = Logger.getRootLogger().setLevel(Level.ERROR)
+    println(greeting)
+    sparkmlTest()
 
-    // $example on$
-    // Load and parse the data
-    // val data = sc.textFile("/example/data/ml-latest/input/ratings.csv")
-    //val ratings = data.map(_ match { case Array(user, item, rate, timestamp) =>
-    //  Rating(user.toInt, item.toInt, rate.toDouble)
-    //})
-    // Build the recommendation model using ALS
-    val ratings: RDD[Rating] = getRatings(spark, "/example/data/ml-latest/input/ratings.csv")
-    val rank = 10
-    val numIterations = 10
-    val model: MatrixFactorizationModel = ALS.train(ratings, rank, numIterations, 0.01)
-
-    // Evaluate the model on rating data
-    val usersProducts = ratings.map { case Rating(user, product, rate) =>
-      (user, product)
+    def sparkmlTest() : Unit = {
+        val spark = SparkSession.builder.appName("CollaborativeFilteringExample").getOrCreate()
+        //spark.sparkContext.setLogLevel("OFF")
+        import spark.implicits._
+        val ratings = spark.read.options(Map("header" ->"true",
+                                            "inferSchema" -> "true"))
+                                 .csv("/example/data/ml-latest/ratings.csv")
+        val Array(training, test) = ratings.randomSplit(Array(0.8, 0.2))
+        training.printSchema()
+        training.show(5)
+        // Build the recommendation model using ALS on the training data
+        val als = new ALS()
+          .setMaxIter(5)
+          .setRegParam(0.01)
+          .setUserCol("userId")
+          .setItemCol("movieId")
+          .setRatingCol("rating")
+        val model = als.fit(training)
+        
+        // Evaluate the model by computing the RMSE on the test data
+        val predictions = model.transform(test).na.drop(Array("prediction"))
+        println(s"☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆") 
+        predictions.printSchema()
+        predictions.show(5)
+        println(s"☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆") 
+        val evaluator = new RegressionEvaluator()
+          .setMetricName("rmse")
+          .setLabelCol("rating")
+          .setPredictionCol("prediction")
+        val rmse = evaluator.evaluate(predictions)
+        println(rmse)
+        println(s"★★★★★★★★★★★★★★★★★★★Root-mean-square error = $rmse")
+        spark.stop()
     }
-    val predictions =
-      model.predict(usersProducts).map { case Rating(user, product, rate) =>
-        ((user, product), rate)
-      }
-    val ratesAndPreds = ratings.map { case Rating(user, product, rate) =>
-      ((user, product), rate)
-    }.join(predictions)
-    val MSE = ratesAndPreds.map { case ((user, product), (r1, r2)) =>
-      val err = (r1 - r2)
-      err * err
-    }.mean()
-    println("Mean Squared Error = " + MSE)
-
-    // Save and load model
-    val sc: SparkContext = spark.sparkContext
-    model.save(sc, "/example/data/ml-latest/output/myCollaborativeFilter")
-    //val sameModel = MatrixFactorizationModel.load(sc, "/example/data/ml-latest/output/myCollaborativeFilter")
-    // $example off$
-
-    spark.stop()
-  }
-
-  def sparkLoadModel(): Unit = {
-    val spark = SparkSession.builder.appName("CollaborativeFilteringExample").getOrCreate()
-    import spark.implicits._
-    val ratings: RDD[Rating] = getRatings(spark, "/example/data/ml-latest/input/ratings.csv")
-    val sc: SparkContext = spark.sparkContext
-    val model: MatrixFactorizationModel = MatrixFactorizationModel.load(sc, "/example/data/ml-latest/output/myCollaborativeFilter")
-
-
-    // Evaluate the model on rating data
-    val usersProducts = ratings.map { case Rating(user, product, rate) =>
-      (user, product)
-    }
-    val predictions =
-      model.predict(usersProducts).map { case Rating(user, product, rate) =>
-        ((user, product), rate)
-      }
-    val ratesAndPreds = ratings.map { case Rating(user, product, rate) =>
-      ((user, product), rate)
-    }.join(predictions)
-    val MSE = ratesAndPreds.map { case ((user, product), (r1, r2)) =>
-      val err = (r1 - r2)
-      err * err
-    }.mean()
-    println("Mean Squared Error = " + MSE)
-    // $example off$
-
-    spark.stop()
-  }
-
-  def getRatings(spark: SparkSession, csvPath: String): RDD[Rating] = {
-    val df: DataFrame = spark.read.option("header","true").csv(csvPath)
-    import spark.implicits._
-    val ds: Dataset[Rating] = df.map(row => {
-      val user: Int = row.getString(0).toInt
-      val item: Int  = row.getString(1).toInt
-      val rate: Double = row.getString(2).toDouble
-      Rating(user, item, rate)
-    })
-    val ratings: RDD[Rating] = ds.rdd
-    return ratings
-  }
 }
-
 trait Greeting {
   lazy val greeting: String = "hello"
 }
