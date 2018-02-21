@@ -44,7 +44,6 @@ object RecommendationExample extends Greeting with App {
           .setLabelCol("rating")
           .setPredictionCol("prediction")
         val rmse = evaluator.evaluate(predictions)
-        println(rmse)
         println(s"★★★★★★★★★★★★★★★★★★★Root-mean-square error = $rmse ★★★★★★★★★★★★★★★★★★★")
         spark.stop()
     }
