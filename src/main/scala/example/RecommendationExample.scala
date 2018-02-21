@@ -32,7 +32,7 @@ object RecommendationExample extends Greeting with App {
           .setItemCol("movieId")
           .setRatingCol("rating")
         val model = als.fit(training)
-        
+
         // Evaluate the model by computing the RMSE on the test data
         val predictions = model.transform(test).na.drop(Array("prediction"))
         println(s"☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆")
